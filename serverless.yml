@@ -1,0 +1,68 @@
+service: chat
+plugins:
+  - serverless-dynamodb-local
+  - serverless-offline
+custom:
+  dynamodb:
+    start:
+      migrate: true
+      port: 8000
+      inMemory: true
+      heapInitial: 200m
+      heapMax: 1g
+      seed: true
+      convertEmptyValues: true
+    stages: 
+      - dev
+  serverless-offline:
+    websocketPort: 3001
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: eu-north-1
+functions:
+  connect:
+    handler: src/functions/connect.handler
+    events:
+      - websocket:
+          route: $connect
+    environment:
+      DYNAMODB_TABLE: chat-connections
+
+  disconnect:
+    handler: src/functions/disconnect.handler
+    events:
+      - websocket:
+          route: $disconnect
+    environment:
+      DYNAMODB_TABLE: chat-connections
+
+  default:
+    handler: src/functions/default.handler
+    events:
+      - websocket:
+          route: $default
+  sendMessage:
+    handler: src/handlers/sendMessage.handler
+    events:
+      - websocket:
+          route: sendMessage
+  dynamodbStream:
+    handler: src/handlers/dynamodbStream.handler
+    events:
+      - stream: 
+resources:
+  Resources:
+    ConnectionsTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: 'connectionId'
+            AttributeType: 'S'
+        KeySchema:
+          - AttributeName: 'connectionId'
+            KeyType: 'HASH'
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: connections
